@@ -1,13 +1,16 @@
 module PgSearch
   class Configuration
     class JsonbColumn < PlainColumn
-      def initialize(name, key)
+      def initialize(name, *keys)
         super(name)
-        @key = key.to_s
+        raise ArgumentError, 'At least one key is required' if keys.nil? || keys.length == 0
+        @keys = keys.map(&:to_s)
       end
 
       def to_sql(connection, *)
-        super + "->>#{connection.quote(@key)}"
+        quoted_keys = @keys.map { |k| connection.quote(k) }
+        path = quoted_keys[0..-2].join('->')
+        super + (path != '' && "->#{path}" || '') + "->>#{quoted_keys.last}"
       end
     end
   end
