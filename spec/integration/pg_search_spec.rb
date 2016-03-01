@@ -7,11 +7,14 @@ describe "an Active Record model which includes PgSearch" do
       t.text 'content'
       t.integer 'parent_model_id'
       t.integer 'importance'
+      t.hstore 'description'
+      t.jsonb 'translations'
     end
 
     model do
       include PgSearch
       belongs_to :parent_model
+      serialize :description, ActiveRecord::Coders::Hstore if defined? ActiveRecord::Coders::Hstore
     end
   end
   with_model :ParentModel do
@@ -137,6 +140,32 @@ describe "an Active Record model which includes PgSearch" do
             }.to raise_error(ArgumentError, /against/)
           end
         end
+      end
+    end
+
+    context "when passed a hstore column" do
+      it "builds a scope" do
+        ModelWithPgSearch.pg_search_scope :search_en_description,
+          :against => PgSearch::Configuration::HstoreColumn.new(:description, 'en')
+
+        included = ModelWithPgSearch.create!(description: { en: 'description', de: 'Deskription' })
+        excluded = ModelWithPgSearch.create!(description: { de: 'Deskription' })
+
+        expect(ModelWithPgSearch.search_en_description('description')).to eq([included])
+        expect(ModelWithPgSearch.search_en_description('Deskription')).to be_empty
+      end
+    end
+
+    context "when passed a jsonb column" do
+      it "builds a scope" do
+        ModelWithPgSearch.pg_search_scope :search_en_description,
+          :against => PgSearch::Configuration::JsonbColumn.new(:translations, 'en')
+
+        included = ModelWithPgSearch.create!(translations: { en: 'description', de: 'Deskription' })
+        excluded = ModelWithPgSearch.create!(translations: { de: 'Deskription' })
+
+        expect(ModelWithPgSearch.search_en_description('description')).to eq([included])
+        expect(ModelWithPgSearch.search_en_description('Deskription')).to be_empty
       end
     end
   end
@@ -615,33 +644,6 @@ describe "an Active Record model which includes PgSearch" do
 
           results = ModelWithPgSearch.search_content_with_english("jump")
           expect(results).to match_array(included)
-        end
-      end
-
-      describe "highlighting" do
-        before do
-          ["Strip Down", "Down", "Down and Out", "Won't Let You Down"].each do |name|
-            ModelWithPgSearch.create! :content => name
-          end
-        end
-
-        context "with highlight turned on" do
-          before do
-            ModelWithPgSearch.pg_search_scope :search_content,
-              :against => :content
-          end
-
-          it "adds a #pg_search_highlight method to each returned model record" do
-            result = ModelWithPgSearch.search_content("Strip Down").with_pg_search_highlight.first
-
-            expect(result.pg_search_highlight).to be_a(String)
-          end
-
-          it "returns excerpts of text where search match occurred" do
-            result = ModelWithPgSearch.search_content("Let").with_pg_search_highlight.first
-
-            expect(result.pg_search_highlight).to eq("Won't <b>Let</b> You Down")
-          end
         end
       end
 
