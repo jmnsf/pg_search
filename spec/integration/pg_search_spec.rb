@@ -156,16 +156,29 @@ describe "an Active Record model which includes PgSearch" do
       end
     end
 
+    context "when passed a complex jsonb column" do
+      it "builds a scope" do
+        ModelWithPgSearch.pg_search_scope :search_en_translations_cpx,
+          :against => PgSearch::Configuration::JsonbColumn.new(:translations, 'en', 'name')
+
+        included = ModelWithPgSearch.create!(translations: { en: { name: 'description' }, de: { name: 'Deskription' } })
+        excluded = ModelWithPgSearch.create!(translations: { de: { name: 'Deskription' } })
+
+        expect(ModelWithPgSearch.search_en_translations_cpx('description')).to eq([included])
+        expect(ModelWithPgSearch.search_en_translations_cpx('Deskription')).to be_empty
+      end
+    end
+
     context "when passed a jsonb column" do
       it "builds a scope" do
-        ModelWithPgSearch.pg_search_scope :search_en_description,
+        ModelWithPgSearch.pg_search_scope :search_en_translations,
           :against => PgSearch::Configuration::JsonbColumn.new(:translations, 'en')
 
         included = ModelWithPgSearch.create!(translations: { en: 'description', de: 'Deskription' })
         excluded = ModelWithPgSearch.create!(translations: { de: 'Deskription' })
 
-        expect(ModelWithPgSearch.search_en_description('description')).to eq([included])
-        expect(ModelWithPgSearch.search_en_description('Deskription')).to be_empty
+        expect(ModelWithPgSearch.search_en_translations('description')).to eq([included])
+        expect(ModelWithPgSearch.search_en_translations('Deskription')).to be_empty
       end
     end
   end
